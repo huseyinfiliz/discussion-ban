@@ -38,7 +38,7 @@ Navigate to the **Admin > Permissions** page to grant the **Ban users** from dis
 
 - [Packagist](https://packagist.org/packages/huseyinfiliz/discussion-ban)
 - [GitHub](https://github.com/huseyinfiliz/discussion-ban)
-- [Discuss](https://discuss.flarum.org/d/PUT_DISCUSS_SLUG_HERE)
+- [Discuss](https://discuss.flarum.org/d/39825-discussion-ban-ban-users-from-discussions)
 
 ## License
 
