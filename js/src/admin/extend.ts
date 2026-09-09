@@ -21,6 +21,11 @@ export default [
       label: app.translator.trans('huseyinfiliz-discussion-ban.admin.settings.show_in_discussion_controls'),
     }))
     .setting(() => ({
+      setting: 'huseyinfiliz-discussion-ban.showInDiscussionSidebar',
+      type: 'boolean',
+      label: app.translator.trans('huseyinfiliz-discussion-ban.admin.settings.show_in_discussion_sidebar'),
+    }))
+    .setting(() => ({
       setting: 'huseyinfiliz-discussion-ban.showInPostControls',
       type: 'boolean',
       label: app.translator.trans('huseyinfiliz-discussion-ban.admin.settings.show_in_post_controls'),
@@ -29,5 +34,10 @@ export default [
       setting: 'huseyinfiliz-discussion-ban.hideDiscussionsFromBanned',
       type: 'boolean',
       label: app.translator.trans('huseyinfiliz-discussion-ban.admin.settings.hide_discussions_from_banned'),
+    }))
+    .setting(() => ({
+      setting: 'huseyinfiliz-discussion-ban.sendNotifications',
+      type: 'boolean',
+      label: app.translator.trans('huseyinfiliz-discussion-ban.admin.settings.send_notifications'),
     })),
 ];

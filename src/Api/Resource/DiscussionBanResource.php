@@ -135,17 +135,25 @@ class DiscussionBanResource extends AbstractDatabaseResource
         /** @var DiscussionBan $model */
         $actor = $context->getActor();
 
-        Post::where('discussion_id', $model->discussion_id)
+        $now = Carbon::now();
+        $affected = Post::where('discussion_id', $model->discussion_id)
             ->where('user_id', $model->user_id)
             ->whereNull('hidden_at')
-            ->get()
-            ->each(function (Post $post) use ($actor) {
-                $post->hide($actor);
-                $post->save();
-                foreach ($post->releaseEvents() as $event) {
-                    $this->events->dispatch($event);
-                }
-            });
+            ->update([
+                'hidden_at' => $now,
+                'hidden_user_id' => $actor->id,
+                'is_discussion_ban_hidden' => true,
+            ]);
+
+        if ($affected > 0) {
+            $discussion = $model->discussion ?: Discussion::find($model->discussion_id);
+            if ($discussion) {
+                $discussion->refreshCommentCount();
+                $discussion->refreshParticipantCount();
+                $discussion->refreshLastPost();
+                $discussion->save();
+            }
+        }
 
         DiscussionBan::resetCache();
 
@@ -168,17 +176,21 @@ class DiscussionBanResource extends AbstractDatabaseResource
 
         DiscussionBan::resetCache();
 
-        Post::where('discussion_id', $model->discussion_id)
+        $affected = Post::where('discussion_id', $model->discussion_id)
             ->where('user_id', $model->user_id)
-            ->whereNotNull('hidden_at')
-            ->get()
-            ->each(function (Post $post) {
-                $post->restore();
-                $post->save();
-                foreach ($post->releaseEvents() as $event) {
-                    $this->events->dispatch($event);
-                }
-            });
+            ->where('is_discussion_ban_hidden', true)
+            ->update([
+                'hidden_at' => null,
+                'hidden_user_id' => null,
+                'is_discussion_ban_hidden' => false,
+            ]);
+
+        if ($affected > 0) {
+            $discussion->refreshCommentCount();
+            $discussion->refreshParticipantCount();
+            $discussion->refreshLastPost();
+            $discussion->save();
+        }
 
         $this->events->dispatch(new Event\Unbanned($model, $actor));
     }

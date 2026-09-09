@@ -15,6 +15,8 @@ use Flarum\User\User;
 use HuseyinFiliz\DiscussionBan\Access\DiscussionBanPolicy;
 use HuseyinFiliz\DiscussionBan\Api\Resource\DiscussionBanResource;
 use HuseyinFiliz\DiscussionBan\Event;
+use HuseyinFiliz\DiscussionBan\Listener;
+use HuseyinFiliz\DiscussionBan\Notification;
 use Illuminate\Database\Eloquent\Builder;
 
 use function Tobyz\JsonApiServer\json_api_response;
@@ -48,12 +50,45 @@ return [
             });
         }),
 
+    (new Extend\Model(Post::class))
+        ->cast('is_discussion_ban_hidden', 'boolean'),
+
+    (new Extend\ApiResource(Resource\PostResource::class))
+        ->fields(fn () => [
+            Schema\Boolean::make('isDiscussionBanHidden')
+                ->property('is_discussion_ban_hidden'),
+        ]),
+
+    (new Extend\Notification())
+        ->type(Notification\DiscussionBannedBlueprint::class, ['alert'])
+        ->type(Notification\DiscussionUnbannedBlueprint::class, ['alert']),
+
+    (new Extend\Event())
+        ->listen(Event\Banned::class, [Listener\SendNotificationWhenDiscussionBanChanged::class, 'handleBanned'])
+        ->listen(Event\Unbanned::class, [Listener\SendNotificationWhenDiscussionBanChanged::class, 'handleUnbanned']),
+
     new Extend\ApiResource(DiscussionBanResource::class),
 
     (new Extend\ApiResource(Resource\DiscussionResource::class))
         ->fields(fn () => [
             Schema\Boolean::make('canBanUsers')
                 ->get(fn (Discussion $discussion, Context $context) => (bool) $context->getActor()->can('banUsers', $discussion)),
+
+            Schema\Integer::make('discussionBansCount')
+                ->visible(function (Discussion $discussion, Context $context) {
+                    if (! $context->getActor()->can('banUsers', $discussion)) {
+                        return false;
+                    }
+
+                    $routeParams = $context->request->getAttribute('routeParameters') ?? [];
+
+                    return ! empty($routeParams['id']);
+                })
+                ->get(function (Discussion $discussion) {
+                    return DiscussionBan::where('discussion_id', $discussion->id)
+                        ->whereNull('revoked_at')
+                        ->count();
+                }),
 
             Schema\Arr::make('bannedUserMap')
                 ->visible(function (Discussion $discussion, Context $context) {
@@ -156,7 +191,10 @@ return [
     (new Extend\Settings())
         ->default('huseyinfiliz-discussion-ban.showInDiscussionControls', true)
         ->serializeToForum('huseyinfiliz-discussion-ban.showInDiscussionControls', 'huseyinfiliz-discussion-ban.showInDiscussionControls', 'boolval')
+        ->default('huseyinfiliz-discussion-ban.showInDiscussionSidebar', true)
+        ->serializeToForum('huseyinfiliz-discussion-ban.showInDiscussionSidebar', 'huseyinfiliz-discussion-ban.showInDiscussionSidebar', 'boolval')
         ->default('huseyinfiliz-discussion-ban.showInPostControls', true)
         ->serializeToForum('huseyinfiliz-discussion-ban.showInPostControls', 'huseyinfiliz-discussion-ban.showInPostControls', 'boolval')
-        ->default('huseyinfiliz-discussion-ban.hideDiscussionsFromBanned', true),
+        ->default('huseyinfiliz-discussion-ban.hideDiscussionsFromBanned', true)
+        ->default('huseyinfiliz-discussion-ban.sendNotifications', false),
 ];

@@ -3,6 +3,9 @@ import { extend } from 'flarum/common/extend';
 import Button from 'flarum/common/components/Button';
 import DiscussionControls from 'flarum/forum/utils/DiscussionControls';
 import PostControls from 'flarum/forum/utils/PostControls';
+import DiscussionPage from 'flarum/forum/components/DiscussionPage';
+import CommentPost from 'flarum/forum/components/CommentPost';
+import NotificationGrid from 'flarum/forum/components/NotificationGrid';
 import type Discussion from 'flarum/common/models/Discussion';
 import type Post from 'flarum/common/models/Post';
 import BanFromDiscussionModal from './components/BanFromDiscussionModal';
@@ -24,6 +27,64 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
         app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_controls.ban_from_discussion')
       )
     );
+  });
+
+  extend(DiscussionPage.prototype, 'sidebarItems', function (items) {
+    if (!app.forum.attribute('huseyinfiliz-discussion-ban.showInDiscussionSidebar')) return;
+    if (!this.discussion || !this.discussion.attribute('canBanUsers')) return;
+
+    const bansCount = this.discussion.attribute<number>('discussionBansCount');
+    const bannedUserMap = this.discussion.attribute<Record<string, number>>('bannedUserMap') || {};
+    const count = bansCount !== undefined ? bansCount : Object.keys(bannedUserMap).length;
+
+    const label =
+      count > 0
+        ? `${app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_page.ban_button')} (${count})`
+        : app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_page.ban_button');
+
+    items.add(
+      'discussion-ban',
+      Button.component(
+        {
+          className: 'Button Button--icon',
+          icon: 'fas fa-ban',
+          onclick: () => app.modal.show(BanFromDiscussionModal, { discussion: this.discussion! }),
+        },
+        label
+      ),
+      80
+    );
+  });
+
+  extend(CommentPost.prototype, 'headerItems', function (items) {
+    const post = this.attrs.post;
+    const isBanHidden =
+      post.attribute('isDiscussionBanHidden') ||
+      Boolean(post.discussion()?.attribute<Record<string, number>>('bannedUserMap')?.[String(post.user()?.id())]);
+
+    if (post.isHidden() && isBanHidden) {
+      items.add(
+        'discussion-ban-badge',
+        <span className="Post-discussionBan-badge">
+          <i className="fas fa-ban" />
+          <span>{app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')}</span>
+        </span>,
+        50
+      );
+    }
+  });
+
+  extend(NotificationGrid.prototype, 'notificationTypes', function (items) {
+    items.add('discussionBanned', {
+      name: 'discussionBanned',
+      icon: 'fas fa-ban',
+      label: app.translator.trans('huseyinfiliz-discussion-ban.forum.settings.notify_discussion_banned_label'),
+    });
+    items.add('discussionUnbanned', {
+      name: 'discussionUnbanned',
+      icon: 'fas fa-user-check',
+      label: app.translator.trans('huseyinfiliz-discussion-ban.forum.settings.notify_discussion_unbanned_label'),
+    });
   });
 
   extend(PostControls, 'moderationControls', function (items, post: Post) {
@@ -59,11 +120,13 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
                 .then(() => {
                   const map = { ...(discussion.attribute<Record<string, number>>('bannedUserMap') || {}) };
                   delete map[postUserId];
-                  discussion.pushAttributes({ bannedUserMap: map });
+                  const currentCount = discussion.attribute<number>('discussionBansCount') ?? Object.keys(map).length + 1;
+                  const newCount = Math.max(0, currentCount - 1);
+                  discussion.pushAttributes({ bannedUserMap: map, discussionBansCount: newCount });
 
                   app.store.all<any>('posts').forEach((p) => {
                     if (p.discussion()?.id() === discussion.id() && String(p.user()?.id()) === postUserId) {
-                      p.pushAttributes({ isHidden: false, hiddenAt: null });
+                      p.pushAttributes({ isHidden: false, hiddenAt: null, isDiscussionBanHidden: false });
                     }
                   });
 

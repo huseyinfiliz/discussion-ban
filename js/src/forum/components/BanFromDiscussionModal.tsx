@@ -310,11 +310,13 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         const userId = String(this.selectedUser!.id());
         const map = { ...(this.attrs.discussion.attribute<Record<string, number>>('bannedUserMap') || {}) };
         map[userId] = Number(ban.id());
-        this.attrs.discussion.pushAttributes({ bannedUserMap: map });
+        const currentCount = this.attrs.discussion.attribute<number>('discussionBansCount') ?? Object.keys(map).length - 1;
+        const newCount = currentCount + 1;
+        this.attrs.discussion.pushAttributes({ bannedUserMap: map, discussionBansCount: newCount });
 
         app.store.all<any>('posts').forEach((post) => {
           if (post.discussion()?.id() === this.attrs.discussion.id() && String(post.user()?.id()) === userId) {
-            post.pushAttributes({ isHidden: true, hiddenAt: new Date().toISOString() });
+            post.pushAttributes({ isHidden: true, hiddenAt: new Date().toISOString(), isDiscussionBanHidden: true });
           }
         });
 
@@ -363,11 +365,13 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       if (userId) {
         const map = { ...(this.attrs.discussion.attribute<Record<string, number>>('bannedUserMap') || {}) };
         delete map[userId];
-        this.attrs.discussion.pushAttributes({ bannedUserMap: map });
+        const currentCount = this.attrs.discussion.attribute<number>('discussionBansCount') ?? Object.keys(map).length + 1;
+        const newCount = Math.max(0, currentCount - 1);
+        this.attrs.discussion.pushAttributes({ bannedUserMap: map, discussionBansCount: newCount });
 
         app.store.all<any>('posts').forEach((post) => {
           if (post.discussion()?.id() === this.attrs.discussion.id() && String(post.user()?.id()) === userId) {
-            post.pushAttributes({ isHidden: false, hiddenAt: null });
+            post.pushAttributes({ isHidden: false, hiddenAt: null, isDiscussionBanHidden: false });
           }
         });
       }

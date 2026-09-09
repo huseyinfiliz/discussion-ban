@@ -4,6 +4,7 @@ namespace HuseyinFiliz\DiscussionBan\Tests\integration\api;
 
 use Flarum\Discussion\Discussion;
 use Flarum\Group\Group;
+use Flarum\Notification\Notification;
 use Flarum\Post\Post;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
@@ -41,7 +42,8 @@ class DiscussionBanLifecycleTest extends TestCase
             ],
             Post::class => [
                 ['id' => 1, 'discussion_id' => 1, 'user_id' => 1, 'type' => 'comment', 'content' => '<t><p>First post</p></t>', 'created_at' => '2026-01-01 00:00:00'],
-                ['id' => 2, 'discussion_id' => 1, 'user_id' => 4, 'type' => 'comment', 'content' => '<t><p>Bad user post</p></t>', 'hidden_at' => null, 'created_at' => '2026-01-01 00:00:00'],
+                ['id' => 2, 'discussion_id' => 1, 'user_id' => 4, 'type' => 'comment', 'content' => '<t><p>Bad user post</p></t>', 'hidden_at' => null, 'is_discussion_ban_hidden' => false, 'created_at' => '2026-01-01 00:00:00'],
+                ['id' => 3, 'discussion_id' => 1, 'user_id' => 4, 'type' => 'comment', 'content' => '<t><p>Already deleted post</p></t>', 'hidden_at' => '2026-01-01 01:00:00', 'is_discussion_ban_hidden' => false, 'created_at' => '2026-01-01 00:00:00'],
             ],
         ]);
     }
@@ -74,6 +76,19 @@ class DiscussionBanLifecycleTest extends TestCase
 
         $post = Post::find(2);
         $this->assertNotNull($post->hidden_at);
+        $this->assertTrue((bool) $post->is_discussion_ban_hidden);
+
+        $post3 = Post::find(3);
+        $this->assertFalse((bool) $post3->is_discussion_ban_hidden);
+
+        $discussionResponse = $this->send(
+            $this->request('GET', '/api/discussions/1', [
+                'authenticatedAs' => 3,
+            ])
+        );
+        $this->assertEquals(200, $discussionResponse->getStatusCode());
+        $body = json_decode($discussionResponse->getBody()->getContents(), true);
+        $this->assertEquals(1, $body['data']['attributes']['discussionBansCount']);
 
         $replyResponseDefault = $this->send(
             $this->request('POST', '/api/posts', [
@@ -120,6 +135,20 @@ class DiscussionBanLifecycleTest extends TestCase
 
         $post->refresh();
         $this->assertNull($post->hidden_at);
+        $this->assertFalse((bool) $post->is_discussion_ban_hidden);
+
+        // Verify post 3 (deleted before ban) remains deleted
+        $post3->refresh();
+        $this->assertNotNull($post3->hidden_at);
+        $this->assertFalse((bool) $post3->is_discussion_ban_hidden);
+
+        $discussionResponseAfterUnban = $this->send(
+            $this->request('GET', '/api/discussions/1', [
+                'authenticatedAs' => 3,
+            ])
+        );
+        $bodyAfter = json_decode($discussionResponseAfterUnban->getBody()->getContents(), true);
+        $this->assertEquals(0, $bodyAfter['data']['attributes']['discussionBansCount']);
     }
 
     public function test_moderator_cannot_ban_administrator()
@@ -140,5 +169,72 @@ class DiscussionBanLifecycleTest extends TestCase
         );
 
         $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_notifications_sent_only_when_enabled()
+    {
+        /** @var SettingsRepositoryInterface $settings */
+        $settings = $this->app()->getContainer()->make(SettingsRepositoryInterface::class);
+
+        // 1. By default, sendNotifications is false
+        $this->assertFalse((bool) $settings->get('huseyinfiliz-discussion-ban.sendNotifications', false));
+
+        $res1 = $this->send(
+            $this->request('POST', '/api/discussion-bans', [
+                'authenticatedAs' => 3,
+                'json' => [
+                    'data' => [
+                        'type' => 'discussion-bans',
+                        'attributes' => ['reason' => 'Off-topic'],
+                        'relationships' => [
+                            'discussion' => ['data' => ['type' => 'discussions', 'id' => '1']],
+                            'user' => ['data' => ['type' => 'users', 'id' => '4']],
+                        ],
+                    ],
+                ],
+            ])
+        );
+        $this->assertEquals(201, $res1->getStatusCode());
+
+        $this->assertEquals(0, Notification::where('user_id', 4)->count());
+
+        $ban = DiscussionBan::activeBan(1, 4);
+        $this->send(
+            $this->request('DELETE', "/api/discussion-bans/{$ban->id}", [
+                'authenticatedAs' => 3,
+            ])
+        );
+        $this->assertEquals(0, Notification::where('user_id', 4)->count());
+
+        // 2. Enable sendNotifications
+        $settings->set('huseyinfiliz-discussion-ban.sendNotifications', true);
+
+        $res2 = $this->send(
+            $this->request('POST', '/api/discussion-bans', [
+                'authenticatedAs' => 3,
+                'json' => [
+                    'data' => [
+                        'type' => 'discussion-bans',
+                        'attributes' => ['reason' => 'Spamming again'],
+                        'relationships' => [
+                            'discussion' => ['data' => ['type' => 'discussions', 'id' => '1']],
+                            'user' => ['data' => ['type' => 'users', 'id' => '4']],
+                        ],
+                    ],
+                ],
+            ])
+        );
+        $this->assertEquals(201, $res2->getStatusCode());
+
+        $this->assertEquals(1, Notification::where('user_id', 4)->where('type', 'discussionBanned')->count());
+
+        $ban2 = DiscussionBan::activeBan(1, 4);
+        $this->send(
+            $this->request('DELETE', "/api/discussion-bans/{$ban2->id}", [
+                'authenticatedAs' => 3,
+            ])
+        );
+
+        $this->assertEquals(1, Notification::where('user_id', 4)->where('type', 'discussionUnbanned')->count());
     }
 }
