@@ -62,8 +62,7 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
     const user = post.user();
     const userId = user ? String(user.id()) : null;
     const isBanHidden =
-      post.attribute('isDiscussionBanHidden') ||
-      Boolean(userId && post.discussion()?.attribute<Record<string, number>>('bannedUserMap')?.[userId]);
+      post.attribute('isDiscussionBanHidden') || Boolean(userId && post.discussion()?.attribute<Record<string, number>>('bannedUserMap')?.[userId]);
 
     if (post.isHidden() && isBanHidden) {
       items.add(

@@ -6,7 +6,5 @@ import DiscussionUnbannedNotification from './components/DiscussionUnbannedNotif
 export default [
   ...commonExtend,
 
-  new Extend.Notification()
-    .add('discussionBanned', DiscussionBannedNotification)
-    .add('discussionUnbanned', DiscussionUnbannedNotification),
+  new Extend.Notification().add('discussionBanned', DiscussionBannedNotification).add('discussionUnbanned', DiscussionUnbannedNotification),
 ];
