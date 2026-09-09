@@ -24,7 +24,7 @@ export default class DiscussionBannedNotification extends Notification {
   }
 
   excerpt() {
-    const data = this.attrs.notification.data() as { reason?: string | null } | undefined;
+    const data = (this.attrs.notification.attribute('data') || {}) as { reason?: string | null };
     return data?.reason || '';
   }
 }

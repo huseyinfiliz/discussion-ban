@@ -22,4 +22,8 @@ export default class DiscussionUnbannedNotification extends Notification {
       title: discussion ? discussion.title() : '',
     });
   }
+
+  excerpt(): null {
+    return null;
+  }
 }
