@@ -1,4 +1,5 @@
 import app from 'flarum/forum/app';
+import m from 'mithril';
 import { extend } from 'flarum/common/extend';
 import Button from 'flarum/common/components/Button';
 import DiscussionControls from 'flarum/forum/utils/DiscussionControls';
@@ -65,10 +66,10 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
     if (post.isHidden() && isBanHidden) {
       items.add(
         'discussion-ban-badge',
-        <span className="Post-discussionBan-badge">
-          <i className="fas fa-ban" />
-          <span>{app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')}</span>
-        </span>,
+        m('span.Post-discussionBan-badge', [
+          m('i.fas.fa-ban'),
+          m('span', app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')),
+        ]),
         50
       );
     }

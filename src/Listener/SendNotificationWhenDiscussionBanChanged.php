@@ -25,6 +25,15 @@ class SendNotificationWhenDiscussionBanChanged
         protected SettingsRepositoryInterface $settings
     ) {}
 
+    public function handle(Event\Banned|Event\Unbanned $event): void
+    {
+        if ($event instanceof Event\Banned) {
+            $this->handleBanned($event);
+        } elseif ($event instanceof Event\Unbanned) {
+            $this->handleUnbanned($event);
+        }
+    }
+
     public function handleBanned(Event\Banned $event): void
     {
         if (! $this->settings->get('huseyinfiliz-discussion-ban.sendNotifications', false)) {

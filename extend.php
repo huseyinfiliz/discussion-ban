@@ -64,8 +64,8 @@ return [
         ->type(Notification\DiscussionUnbannedBlueprint::class, ['alert']),
 
     (new Extend\Event())
-        ->listen(Event\Banned::class, [Listener\SendNotificationWhenDiscussionBanChanged::class, 'handleBanned'])
-        ->listen(Event\Unbanned::class, [Listener\SendNotificationWhenDiscussionBanChanged::class, 'handleUnbanned']),
+        ->listen(Event\Banned::class, Listener\SendNotificationWhenDiscussionBanChanged::class)
+        ->listen(Event\Unbanned::class, Listener\SendNotificationWhenDiscussionBanChanged::class),
 
     new Extend\ApiResource(DiscussionBanResource::class),
 
