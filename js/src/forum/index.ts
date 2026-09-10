@@ -6,7 +6,6 @@ import DiscussionControls from 'flarum/forum/utils/DiscussionControls';
 import PostControls from 'flarum/forum/utils/PostControls';
 import DiscussionPage from 'flarum/forum/components/DiscussionPage';
 import CommentPost from 'flarum/forum/components/CommentPost';
-import NotificationGrid from 'flarum/forum/components/NotificationGrid';
 import type Discussion from 'flarum/common/models/Discussion';
 import type Post from 'flarum/common/models/Post';
 import BanFromDiscussionModal from './components/BanFromDiscussionModal';
@@ -76,7 +75,7 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
     }
   });
 
-  extend(NotificationGrid.prototype, 'notificationTypes', function (items) {
+  extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items: any) {
     items.add('discussionBanned', {
       name: 'discussionBanned',
       icon: 'fas fa-ban',
