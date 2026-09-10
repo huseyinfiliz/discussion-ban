@@ -18,6 +18,9 @@ interface Attrs extends IInternalModalAttrs {
 export default class BanFromDiscussionModal extends Modal<Attrs> {
   activeTab: 'ban' | 'list' = 'ban';
 
+  protected searchRequestId = 0;
+  protected searchTimeout: number | null = null;
+
   searchQuery = '';
   isDropdownDismissed = false;
   showResults = true;
@@ -28,7 +31,6 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   loadingBans = false;
   bans: DiscussionBan[] = [];
   bansFilter = Stream('');
-  searchTimeout: number | null = null;
 
   get query(): any {
     const fn = (val?: string) => {
@@ -50,8 +52,14 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   oninit(vnode: any) {
     super.oninit(vnode);
 
+    this.searchRequestId++;
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+      this.searchTimeout = null;
+    }
+
     this.isDropdownDismissed = false;
-    this.showResults = true;
+    this.showResults = false;
     this.searchQuery = '';
     this.searchResults = [];
     this.searching = false;
@@ -290,78 +298,87 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
 
   onQueryInput(value: string) {
     this.searchQuery = value;
-    this.isDropdownDismissed = false;
-    this.showResults = true;
 
     if (this.searchTimeout) {
-      window.clearTimeout(this.searchTimeout);
+      clearTimeout(this.searchTimeout);
       this.searchTimeout = null;
     }
 
-    const trimmed = this.searchQuery.trim();
+    const trimmed = value.trim();
+
     if (trimmed.length < 2) {
+      this.searchRequestId++; // Invalidate any running requests
       this.searchResults = [];
       this.searching = false;
+      this.isDropdownDismissed = false;
+      this.showResults = false;
       m.redraw();
       return;
     }
 
     this.searching = true;
+    this.showResults = true;
+    this.isDropdownDismissed = false;
     m.redraw();
-    this.searchTimeout = window.setTimeout(() => this.search(trimmed), 300);
+
+    this.searchTimeout = window.setTimeout(() => {
+      this.performSearch(trimmed);
+    }, 300);
   }
 
-  search(query?: string) {
-    const trimmed = (query !== undefined ? query : this.searchQuery).trim();
-    if (trimmed.length < 2) {
-      this.searchResults = [];
-      this.searching = false;
-      m.redraw();
-      return;
-    }
+  performSearch(query: string) {
+    const currentRequestId = ++this.searchRequestId;
 
-    this.searching = true;
-    m.redraw();
-
-    app
-      .request<any>({
-        method: 'GET',
-        url: `${app.forum.attribute('apiUrl')}/users/discussion-participants/${this.attrs.discussion.id()}`,
-        params: { filter: { q: trimmed } },
+    app.store
+      .find<User[]>('users', {
+        filter: { q: query },
+        page: { limit: 10 },
       })
-      .then((response: any) => {
-        if (this.searchQuery.trim().length < 2) {
-          this.searchResults = [];
-          this.searching = false;
-          m.redraw();
+      .then((results) => {
+        // Ignore response if a newer search was initiated
+        if (currentRequestId !== this.searchRequestId) {
           return;
         }
 
-        const pushed = app.store.pushPayload(response);
-        const users = Array.isArray(pushed) ? pushed : pushed ? [pushed] : [];
-        this.searchResults = users as User[];
+        this.searchResults = (results || []).filter((user) => user && user.id());
         this.searching = false;
-        this.isDropdownDismissed = false;
-        this.showResults = true;
         m.redraw();
       })
-      .catch(() => {
+      .catch((error) => {
+        if (currentRequestId !== this.searchRequestId) {
+          return;
+        }
+
+        this.searchResults = [];
         this.searching = false;
         m.redraw();
       });
   }
 
+  search(query?: string) {
+    const trimmed = (query !== undefined ? query : this.searchQuery).trim();
+    if (trimmed.length < 2) {
+      this.searchRequestId++;
+      this.searchResults = [];
+      this.searching = false;
+      m.redraw();
+      return;
+    }
+    this.performSearch(trimmed);
+  }
+
   clearSearch() {
+    this.searchRequestId++;
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+      this.searchTimeout = null;
+    }
+
     this.searchQuery = '';
     this.searchResults = [];
     this.searching = false;
     this.isDropdownDismissed = false;
-    this.showResults = true;
-
-    if (this.searchTimeout) {
-      window.clearTimeout(this.searchTimeout);
-      this.searchTimeout = null;
-    }
+    this.showResults = false;
 
     m.redraw();
   }
