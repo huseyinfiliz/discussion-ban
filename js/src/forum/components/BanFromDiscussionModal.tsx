@@ -355,7 +355,6 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         method: 'GET',
         url: `${app.forum.attribute('apiUrl')}/users/discussion-participants/${this.attrs.discussion.id()}`,
         params: { filter: { q: query } },
-        background: true,
       })
       .then((response: any) => {
         // Ignore response if a newer search was initiated
@@ -363,7 +362,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
           return;
         }
 
-        const pushed = app.store.pushPayload(response);
+        const pushed = response ? app.store.pushPayload(response) : [];
         const apiUsers = Array.isArray(pushed) ? pushed : pushed ? [pushed] : [];
 
         // Also merge any matching participants already loaded in the store
@@ -394,11 +393,6 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         this.isDropdownDismissed = false;
 
         m.redraw();
-        if (typeof (m.redraw as any).sync === 'function') {
-          try {
-            (m.redraw as any).sync();
-          } catch (_) {}
-        }
       })
       .catch(() => {
         if (currentRequestId !== this.searchRequestId) {
@@ -417,21 +411,11 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         this.isDropdownDismissed = false;
 
         m.redraw();
-        if (typeof (m.redraw as any).sync === 'function') {
-          try {
-            (m.redraw as any).sync();
-          } catch (_) {}
-        }
       })
       .finally(() => {
         if (currentRequestId === this.searchRequestId && this.searching) {
           this.searching = false;
           m.redraw();
-          if (typeof (m.redraw as any).sync === 'function') {
-            try {
-              (m.redraw as any).sync();
-            } catch (_) {}
-          }
         }
       });
   }
