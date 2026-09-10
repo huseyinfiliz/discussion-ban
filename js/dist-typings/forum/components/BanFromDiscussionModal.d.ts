@@ -8,7 +8,9 @@ interface Attrs extends IInternalModalAttrs {
 }
 export default class BanFromDiscussionModal extends Modal<Attrs> {
     activeTab: 'ban' | 'list';
-    searchQuery: any;
+    private _searchQuery;
+    isDropdownDismissed: boolean;
+    showResults: boolean;
     searchResults: User[];
     searching: boolean;
     selectedUser: User | null;
@@ -17,6 +19,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
     bans: DiscussionBan[];
     bansFilter: any;
     searchTimeout: number | null;
+    get searchQuery(): any;
+    set searchQuery(val: any);
     get query(): any;
     set query(val: any);
     oninit(vnode: any): void;
@@ -27,6 +31,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
     listTab(): JSX.Element;
     onQueryInput(value: string): void;
     search(value: string): void;
+    clearSearch(): void;
     selectUser(user: User): void;
     submit(): void;
     loadBans(): void;
