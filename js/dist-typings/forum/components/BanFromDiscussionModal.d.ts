@@ -8,7 +8,7 @@ interface Attrs extends IInternalModalAttrs {
 }
 export default class BanFromDiscussionModal extends Modal<Attrs> {
     activeTab: 'ban' | 'list';
-    query: any;
+    searchQuery: any;
     searchResults: User[];
     searching: boolean;
     selectedUser: User | null;
@@ -17,6 +17,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
     bans: DiscussionBan[];
     bansFilter: any;
     searchTimeout: number | null;
+    get query(): any;
+    set query(val: any);
     oninit(vnode: any): void;
     className(): string;
     title(): string | any[];
