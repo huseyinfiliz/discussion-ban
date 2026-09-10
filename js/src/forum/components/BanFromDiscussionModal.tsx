@@ -316,42 +316,97 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       return;
     }
 
+    const requestId = ++this.searchRequestId;
     this.searching = true;
     this.showResults = true;
     this.isDropdownDismissed = false;
     m.redraw();
 
     this.searchTimeout = window.setTimeout(() => {
-      this.performSearch(trimmed);
+      this.performSearch(trimmed, requestId);
     }, 300);
   }
 
-  performSearch(query: string) {
-    const currentRequestId = ++this.searchRequestId;
+  getDiscussionParticipantUsers(): User[] {
+    const discussionId = this.attrs.discussion.id();
+    const bannedUserMap = this.attrs.discussion.attribute<Record<string, number>>('bannedUserMap') || {};
+    const currentUserId = String(app.session.user?.id());
+    const seen = new Set<string>();
+    const participants: User[] = [];
 
-    app.store
-      .find<User[]>('users', {
-        filter: { q: query },
-        page: { limit: 10 },
+    app.store.all<any>('posts').forEach((post) => {
+      if (post.discussion()?.id() !== discussionId) return;
+      const u = post.user();
+      if (!u || !u.id()) return;
+      const id = String(u.id());
+      if (id === currentUserId || u.isAdmin() || bannedUserMap[id] || seen.has(id)) return;
+      seen.add(id);
+      participants.push(u);
+    });
+
+    return participants;
+  }
+
+  performSearch(query: string, requestId?: number) {
+    const currentRequestId = requestId ?? ++this.searchRequestId;
+
+    app
+      .request<any>({
+        method: 'GET',
+        url: `${app.forum.attribute('apiUrl')}/users/discussion-participants/${this.attrs.discussion.id()}`,
+        params: { filter: { q: query } },
       })
-      .then((results) => {
+      .then((response: any) => {
         // Ignore response if a newer search was initiated
         if (currentRequestId !== this.searchRequestId) {
           return;
         }
 
-        this.searchResults = (results || []).filter((user) => user && user.id());
-        this.searching = false;
-        m.redraw();
+        const pushed = app.store.pushPayload(response);
+        const apiUsers = Array.isArray(pushed) ? pushed : pushed ? [pushed] : [];
+
+        // Also merge any matching participants already loaded in the store
+        const q = query.toLowerCase();
+        const localUsers = this.getDiscussionParticipantUsers().filter((u) => {
+          const username = u.username()?.toLowerCase() || '';
+          const displayName = u.displayName()?.toLowerCase() || '';
+          return username.includes(q) || displayName.includes(q);
+        });
+
+        // Combine and deduplicate
+        const userMap = new Map<string, User>();
+        [...apiUsers, ...localUsers].forEach((user) => {
+          if (user && user.id()) {
+            userMap.set(String(user.id()), user);
+          }
+        });
+
+        const bannedUserMap = this.attrs.discussion.attribute<Record<string, number>>('bannedUserMap') || {};
+        const currentUserId = String(app.session.user?.id());
+
+        this.searchResults = Array.from(userMap.values()).filter((user) => {
+          const uid = String(user.id());
+          return uid !== currentUserId && !user.isAdmin() && !bannedUserMap[uid];
+        });
       })
-      .catch((error) => {
+      .catch(() => {
         if (currentRequestId !== this.searchRequestId) {
           return;
         }
 
-        this.searchResults = [];
-        this.searching = false;
-        m.redraw();
+        // Fallback to local participants from loaded discussion posts
+        const q = query.toLowerCase();
+        this.searchResults = this.getDiscussionParticipantUsers().filter((u) => {
+          const username = u.username()?.toLowerCase() || '';
+          const displayName = u.displayName()?.toLowerCase() || '';
+          return username.includes(q) || displayName.includes(q);
+        });
+      })
+      .finally(() => {
+        if (currentRequestId === this.searchRequestId) {
+          this.searching = false;
+          m.redraw();
+        }
       });
   }
 
@@ -364,7 +419,12 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       m.redraw();
       return;
     }
-    this.performSearch(trimmed);
+    const requestId = ++this.searchRequestId;
+    this.searching = true;
+    this.showResults = true;
+    this.isDropdownDismissed = false;
+    m.redraw();
+    this.performSearch(trimmed, requestId);
   }
 
   clearSearch() {
