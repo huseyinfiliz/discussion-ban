@@ -18,7 +18,9 @@ interface Attrs extends IInternalModalAttrs {
 export default class BanFromDiscussionModal extends Modal<Attrs> {
   activeTab: 'ban' | 'list' = 'ban';
 
-  searchQuery = Stream('');
+  private _searchQuery = '';
+  isDropdownDismissed = false;
+  showResults = true;
   searchResults: User[] = [];
   searching = false;
   selectedUser: User | null = null;
@@ -28,7 +30,28 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   bansFilter = Stream('');
   searchTimeout: number | null = null;
 
-  get query() {
+  get searchQuery(): any {
+    const fn = (val?: string) => {
+      if (val !== undefined) {
+        this._searchQuery = String(val);
+        return this._searchQuery;
+      }
+      return this._searchQuery;
+    };
+    fn.toString = () => this._searchQuery;
+    fn.valueOf = () => this._searchQuery;
+    return fn;
+  }
+
+  set searchQuery(val: any) {
+    if (typeof val === 'function') {
+      this._searchQuery = String(val());
+    } else {
+      this._searchQuery = String(val ?? '');
+    }
+  }
+
+  get query(): any {
     return this.searchQuery;
   }
 
@@ -39,8 +62,16 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   oninit(vnode: any) {
     super.oninit(vnode);
 
+    this.isDropdownDismissed = false;
+    this.showResults = true;
+    this.searchQuery = '';
+    this.searchResults = [];
+    this.searching = false;
+
     if (this.attrs.preselectedUser) {
       this.selectedUser = this.attrs.preselectedUser;
+    } else {
+      this.selectedUser = null;
     }
 
     this.loadBans();
@@ -86,7 +117,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   }
 
   banTab() {
-    const query = this.searchQuery().trim();
+    const query = (typeof this.searchQuery === 'function' ? this.searchQuery() : this.searchQuery).trim();
 
     return (
       <div className="BanFromDiscussionModal-content">
@@ -107,26 +138,34 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
                 title={app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.change_user')}
                 onclick={() => {
                   this.selectedUser = null;
-                  this.searchQuery('');
-                  this.searchResults = [];
+                  this.clearSearch();
                 }}
               />
             </div>
           ) : (
             <div className="BanFromDiscussionModal-search">
-              <input
-                className="FormControl"
-                type="text"
-                placeholder={String(app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.search_placeholder'))}
-                oninput={(e: any) => this.onQueryInput(e.target.value)}
-                value={this.searchQuery()}
-              />
-              {this.searching && (
-                <div className="BanFromDiscussionModal-searchSpinner">
-                  <LoadingIndicator size="small" />
-                </div>
-              )}
-              {query.length >= 2 && this.searchResults.length > 0 && (
+              <div className="BanFromDiscussionModal-searchInputWrapper">
+                <input
+                  className="FormControl"
+                  type="text"
+                  placeholder={String(app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.search_placeholder'))}
+                  oninput={(e: any) => this.onQueryInput(e.target.value)}
+                  value={typeof this.searchQuery === 'function' ? this.searchQuery() : this.searchQuery}
+                />
+                {this.searching && (
+                  <div className="BanFromDiscussionModal-searchSpinner">
+                    <LoadingIndicator size="small" />
+                  </div>
+                )}
+                {query.length > 0 && !this.searching && (
+                  <Button
+                    className="Button Button--icon Button--link BanFromDiscussionModal-clearBtn"
+                    icon="fas fa-times"
+                    onclick={() => this.clearSearch()}
+                  />
+                )}
+              </div>
+              {!this.isDropdownDismissed && this.showResults && query.length >= 2 && this.searchResults.length > 0 && (
                 <ul className="BanFromDiscussionModal-results">
                   {this.searchResults.map((user) => (
                     <li key={user.id()} onclick={() => this.selectUser(user)}>
@@ -262,6 +301,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   }
 
   onQueryInput(value: string) {
+    this.isDropdownDismissed = false;
+    this.showResults = true;
     this.searchQuery(value);
 
     if (this.searchTimeout) {
@@ -299,7 +340,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         params: { filter: { q: trimmed } },
       })
       .then((response: any) => {
-        if (this.searchQuery().trim().length < 2) {
+        const currentQuery = typeof this.searchQuery === 'function' ? this.searchQuery() : this.searchQuery;
+        if (String(currentQuery).trim().length < 2) {
           this.searchResults = [];
           this.searching = false;
           m.redraw();
@@ -308,6 +350,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
 
         this.searchResults = app.store.pushPayload(response) as unknown as User[];
         this.searching = false;
+        this.isDropdownDismissed = false;
+        this.showResults = true;
         m.redraw();
       })
       .catch(() => {
@@ -316,14 +360,24 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       });
   }
 
-  selectUser(user: User) {
-    this.selectedUser = user;
+  clearSearch() {
+    this.searchQuery = '';
     this.searchResults = [];
-    this.searchQuery('');
+    this.searching = false;
+    this.isDropdownDismissed = false;
+    this.showResults = true;
+
     if (this.searchTimeout) {
       window.clearTimeout(this.searchTimeout);
       this.searchTimeout = null;
     }
+
+    m.redraw();
+  }
+
+  selectUser(user: User) {
+    this.selectedUser = user;
+    this.clearSearch();
   }
 
   submit() {
