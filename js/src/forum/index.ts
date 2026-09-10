@@ -65,14 +65,10 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
     if (post.isHidden() && isBanHidden) {
       items.add(
         'discussion-ban-badge',
-        m(
-          'span.Post-discussionBan-badge',
-          {},
-          [
-            m('i.fas.fa-ban', {}),
-            m('span', {}, app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')),
-          ]
-        ),
+        m('span.Post-discussionBan-badge', {}, [
+          m('i.fas.fa-ban', {}),
+          m('span', {}, app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')),
+        ]),
         50
       );
     }
