@@ -357,7 +357,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         }
 
         const pushed = response ? app.store.pushPayload(response) : [];
-        const apiUsers = Array.isArray(pushed) ? pushed : pushed ? [pushed] : [];
+        const apiUsers = (Array.isArray(pushed) ? pushed : pushed ? [pushed] : []) as unknown as User[];
 
         // Also merge any matching participants already loaded in the store
         const q = query.toLowerCase();
@@ -369,7 +369,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
 
         // Combine and deduplicate
         const userMap = new Map<string, User>();
-        [...apiUsers, ...localUsers].forEach((user) => {
+        [...apiUsers, ...localUsers].forEach((user: User) => {
           if (user && user.id()) {
             userMap.set(String(user.id()), user);
           }
