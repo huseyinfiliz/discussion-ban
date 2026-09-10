@@ -12,6 +12,7 @@ huseyinfiliz-discussion-ban:
     discussion_page:
       ban_button: Discussion Ban
     discussion_controls:
+      ban_button: Discussion Ban
       ban_from_discussion: Ban from discussion
     post_controls:
       ban_from_discussion: Ban from discussion

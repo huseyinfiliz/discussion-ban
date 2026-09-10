@@ -1,4 +1,5 @@
 import app from 'flarum/forum/app';
+import m from 'mithril';
 import Modal, { IInternalModalAttrs } from 'flarum/common/components/Modal';
 import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
@@ -17,7 +18,7 @@ interface Attrs extends IInternalModalAttrs {
 export default class BanFromDiscussionModal extends Modal<Attrs> {
   activeTab: 'ban' | 'list' = 'ban';
 
-  query = Stream('');
+  searchQuery = Stream('');
   searchResults: User[] = [];
   searching = false;
   selectedUser: User | null = null;
@@ -27,13 +28,19 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   bansFilter = Stream('');
   searchTimeout: number | null = null;
 
+  get query() {
+    return this.searchQuery;
+  }
+
+  set query(val: any) {
+    this.searchQuery = val;
+  }
+
   oninit(vnode: any) {
     super.oninit(vnode);
 
     if (this.attrs.preselectedUser) {
       this.selectedUser = this.attrs.preselectedUser;
-    } else {
-      this.search('');
     }
 
     this.loadBans();
@@ -79,6 +86,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   }
 
   banTab() {
+    const query = this.searchQuery().trim();
+
     return (
       <div className="BanFromDiscussionModal-content">
         <div className="Form-group">
@@ -98,7 +107,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
                 title={app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.change_user')}
                 onclick={() => {
                   this.selectedUser = null;
-                  this.search(this.query());
+                  this.searchQuery('');
+                  this.searchResults = [];
                 }}
               />
             </div>
@@ -109,14 +119,14 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
                 type="text"
                 placeholder={String(app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.search_placeholder'))}
                 oninput={(e: any) => this.onQueryInput(e.target.value)}
-                value={this.query()}
+                value={this.searchQuery()}
               />
               {this.searching && (
                 <div className="BanFromDiscussionModal-searchSpinner">
                   <LoadingIndicator size="small" />
                 </div>
               )}
-              {this.searchResults.length > 0 && (
+              {query.length >= 2 && this.searchResults.length > 0 && (
                 <ul className="BanFromDiscussionModal-results">
                   {this.searchResults.map((user) => (
                     <li key={user.id()} onclick={() => this.selectUser(user)}>
@@ -252,16 +262,33 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   }
 
   onQueryInput(value: string) {
-    this.query(value);
+    this.searchQuery(value);
 
     if (this.searchTimeout) {
       window.clearTimeout(this.searchTimeout);
+      this.searchTimeout = null;
     }
 
-    this.searchTimeout = window.setTimeout(() => this.search(value), 300);
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      this.searchResults = [];
+      this.searching = false;
+      m.redraw();
+      return;
+    }
+
+    this.searchTimeout = window.setTimeout(() => this.search(trimmed), 300);
   }
 
   search(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      this.searchResults = [];
+      this.searching = false;
+      m.redraw();
+      return;
+    }
+
     this.searching = true;
     m.redraw();
 
@@ -269,9 +296,16 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       .request<any>({
         method: 'GET',
         url: `${app.forum.attribute('apiUrl')}/users/discussion-participants/${this.attrs.discussion.id()}`,
-        params: { filter: { q: value } },
+        params: { filter: { q: trimmed } },
       })
       .then((response: any) => {
+        if (this.searchQuery().trim().length < 2) {
+          this.searchResults = [];
+          this.searching = false;
+          m.redraw();
+          return;
+        }
+
         this.searchResults = app.store.pushPayload(response) as unknown as User[];
         this.searching = false;
         m.redraw();
@@ -285,7 +319,11 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   selectUser(user: User) {
     this.selectedUser = user;
     this.searchResults = [];
-    this.query('');
+    this.searchQuery('');
+    if (this.searchTimeout) {
+      window.clearTimeout(this.searchTimeout);
+      this.searchTimeout = null;
+    }
   }
 
   submit() {

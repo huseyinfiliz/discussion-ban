@@ -31,16 +31,15 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
 
   extend(DiscussionPage.prototype, 'sidebarItems', function (items) {
     if (!app.forum.attribute('huseyinfiliz-discussion-ban.showInDiscussionSidebar')) return;
-    if (!this.discussion || !this.discussion.attribute('canBanUsers')) return;
+    const discussion = this.discussion;
+    if (!discussion || !discussion.attribute('canBanUsers')) return;
 
-    const bansCount = this.discussion.attribute<number>('discussionBansCount');
-    const bannedUserMap = this.discussion.attribute<Record<string, number>>('bannedUserMap') || {};
-    const count = bansCount !== undefined ? bansCount : Object.keys(bannedUserMap).length;
+    const banCount = Number(discussion.attribute('discussionBansCount')) || 0;
 
     const label =
-      count > 0
-        ? `${app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_page.ban_button')} (${count})`
-        : app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_page.ban_button');
+      banCount > 0
+        ? app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_controls.ban_button') + ' (' + banCount + ')'
+        : app.translator.trans('huseyinfiliz-discussion-ban.forum.discussion_controls.ban_button');
 
     items.add(
       'discussion-ban',
@@ -48,7 +47,7 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
         {
           className: 'Button Button--icon',
           icon: 'fas fa-ban',
-          onclick: () => app.modal.show(BanFromDiscussionModal, { discussion: this.discussion! }),
+          onclick: () => app.modal.show(BanFromDiscussionModal, { discussion }),
         },
         label
       ),
@@ -66,10 +65,14 @@ app.initializers.add('huseyinfiliz-discussion-ban', () => {
     if (post.isHidden() && isBanHidden) {
       items.add(
         'discussion-ban-badge',
-        m('span.Post-discussionBan-badge', [
-          m('i.fas.fa-ban'),
-          m('span', app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')),
-        ]),
+        m(
+          'span.Post-discussionBan-badge',
+          {},
+          [
+            m('i.fas.fa-ban', {}),
+            m('span', {}, app.translator.trans('huseyinfiliz-discussion-ban.forum.post.hidden_by_ban')),
+          ]
+        ),
         50
       );
     }

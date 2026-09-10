@@ -5,6 +5,18 @@
 
   &-content {
     width: 100%;
+    box-sizing: border-box;
+
+    .Form-group {
+      width: 100%;
+      margin-bottom: 16px;
+
+      .Form-label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+    }
   }
 
   &-tabs {
@@ -81,17 +93,31 @@
   &-search {
     position: relative;
     width: 100%;
+    box-sizing: border-box;
 
     input.FormControl {
       width: 100% !important;
-      max-width: 100%;
+      max-width: 100% !important;
       box-sizing: border-box;
+      display: block;
+      padding-right: 36px;
     }
 
     &Spinner {
       position: absolute;
-      right: 12px;
-      top: 10px;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      line-height: 1;
+
+      .LoadingIndicator {
+        margin: 0;
+      }
     }
   }
 
@@ -136,6 +162,13 @@
         color: var(--muted-color, #888);
       }
     }
+  }
+
+  textarea.FormControl {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    display: block;
   }
 
   &-submitBtn {
@@ -280,6 +313,21 @@
   &-loading {
     padding: 40px;
     text-align: center;
+  }
+}
+
+.item-discussion-ban {
+  .Button {
+    width: 100%;
+    text-align: start;
+
+    .Button-icon {
+      margin-inline-end: 6px;
+    }
+
+    .Button-label {
+      display: inline !important;
+    }
   }
 }
 
