@@ -1,5 +1,4 @@
 import app from 'flarum/forum/app';
-import m from 'mithril';
 import Modal, { IInternalModalAttrs } from 'flarum/common/components/Modal';
 import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
@@ -19,6 +18,11 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   activeTab: 'ban' | 'list' = 'ban';
 
   protected searchRequestId = 0;
+  // Id of the most recently *dispatched* (network-sent) search request.
+  // Used purely to know whether a settling promise is the latest in-flight
+  // call, so we can always clear the spinner for it — independent of
+  // whether its results are still relevant to display (see searchRequestId).
+  protected lastDispatchedRequestId = 0;
   protected searchTimeout: number | null = null;
 
   searchQuery = '';
@@ -31,23 +35,6 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   loadingBans = false;
   bans: DiscussionBan[] = [];
   bansFilter = Stream('');
-
-  get query(): any {
-    const fn = (val?: string) => {
-      if (val !== undefined) {
-        this.searchQuery = String(val);
-        return this.searchQuery;
-      }
-      return this.searchQuery;
-    };
-    fn.toString = () => this.searchQuery;
-    fn.valueOf = () => this.searchQuery;
-    return fn;
-  }
-
-  set query(val: any) {
-    this.searchQuery = typeof val === 'function' ? String(val()) : String(val ?? '');
-  }
 
   oninit(vnode: any) {
     super.oninit(vnode);
@@ -306,9 +293,13 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
 
     const trimmed = value.trim();
 
+    // Invalidate any in-flight/queued request for every keystroke, and wipe
+    // stale results immediately so an old query's results can never be shown
+    // underneath the spinner (or after) a newer query.
+    const requestId = ++this.searchRequestId;
+    this.searchResults = [];
+
     if (trimmed.length < 2) {
-      this.searchRequestId++; // Invalidate any running requests
-      this.searchResults = [];
       this.searching = false;
       this.isDropdownDismissed = false;
       this.showResults = false;
@@ -316,13 +307,13 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       return;
     }
 
-    const requestId = ++this.searchRequestId;
     this.searching = true;
     this.showResults = true;
     this.isDropdownDismissed = false;
     m.redraw();
 
     this.searchTimeout = window.setTimeout(() => {
+      this.searchTimeout = null;
       this.performSearch(trimmed, requestId);
     }, 300);
   }
@@ -349,6 +340,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
 
   performSearch(query: string, requestId?: number) {
     const currentRequestId = requestId ?? ++this.searchRequestId;
+    this.lastDispatchedRequestId = currentRequestId;
 
     app
       .request<any>({
@@ -357,7 +349,9 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         params: { filter: { q: query } },
       })
       .then((response: any) => {
-        // Ignore response if a newer search was initiated
+        // Ignore *displaying* results from a superseded search, but still
+        // let the spinner-clearing logic in .finally() run for every
+        // settled request so it never gets stuck.
         if (currentRequestId !== this.searchRequestId) {
           return;
         }
@@ -388,7 +382,6 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
           const uid = String(user.id());
           return uid !== currentUserId && !user.isAdmin() && !bannedUserMap[uid];
         });
-        this.searching = false;
         this.showResults = true;
         this.isDropdownDismissed = false;
 
@@ -406,35 +399,22 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
           const displayName = u.displayName()?.toLowerCase() || '';
           return username.includes(q) || displayName.includes(q);
         });
-        this.searching = false;
         this.showResults = true;
         this.isDropdownDismissed = false;
 
         m.redraw();
       })
       .finally(() => {
-        if (currentRequestId === this.searchRequestId && this.searching) {
+        // This is the only place that clears the spinner for a given
+        // dispatched request, and it does so unconditionally as long as no
+        // newer request has been dispatched since — independent of whether
+        // this request's results were considered stale for display purposes
+        // above. This guarantees the spinner can never get stuck open.
+        if (currentRequestId === this.lastDispatchedRequestId) {
           this.searching = false;
           m.redraw();
         }
       });
-  }
-
-  search(query?: string) {
-    const trimmed = (query !== undefined ? query : this.searchQuery).trim();
-    if (trimmed.length < 2) {
-      this.searchRequestId++;
-      this.searchResults = [];
-      this.searching = false;
-      m.redraw();
-      return;
-    }
-    const requestId = ++this.searchRequestId;
-    this.searching = true;
-    this.showResults = true;
-    this.isDropdownDismissed = false;
-    m.redraw();
-    this.performSearch(trimmed, requestId);
   }
 
   clearSearch() {
