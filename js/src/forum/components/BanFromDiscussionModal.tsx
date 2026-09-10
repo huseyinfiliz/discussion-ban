@@ -355,6 +355,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         method: 'GET',
         url: `${app.forum.attribute('apiUrl')}/users/discussion-participants/${this.attrs.discussion.id()}`,
         params: { filter: { q: query } },
+        background: true,
       })
       .then((response: any) => {
         // Ignore response if a newer search was initiated
@@ -388,6 +389,16 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
           const uid = String(user.id());
           return uid !== currentUserId && !user.isAdmin() && !bannedUserMap[uid];
         });
+        this.searching = false;
+        this.showResults = true;
+        this.isDropdownDismissed = false;
+
+        m.redraw();
+        if (typeof (m.redraw as any).sync === 'function') {
+          try {
+            (m.redraw as any).sync();
+          } catch (_) {}
+        }
       })
       .catch(() => {
         if (currentRequestId !== this.searchRequestId) {
@@ -401,11 +412,26 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
           const displayName = u.displayName()?.toLowerCase() || '';
           return username.includes(q) || displayName.includes(q);
         });
+        this.searching = false;
+        this.showResults = true;
+        this.isDropdownDismissed = false;
+
+        m.redraw();
+        if (typeof (m.redraw as any).sync === 'function') {
+          try {
+            (m.redraw as any).sync();
+          } catch (_) {}
+        }
       })
       .finally(() => {
-        if (currentRequestId === this.searchRequestId) {
+        if (currentRequestId === this.searchRequestId && this.searching) {
           this.searching = false;
           m.redraw();
+          if (typeof (m.redraw as any).sync === 'function') {
+            try {
+              (m.redraw as any).sync();
+            } catch (_) {}
+          }
         }
       });
   }
