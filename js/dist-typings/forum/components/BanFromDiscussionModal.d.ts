@@ -29,7 +29,8 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
     banTab(): JSX.Element;
     listTab(): JSX.Element;
     onQueryInput(value: string): void;
-    performSearch(query: string): void;
+    getDiscussionParticipantUsers(): User[];
+    performSearch(query: string, requestId?: number): void;
     search(query?: string): void;
     clearSearch(): void;
     selectUser(user: User): void;
