@@ -18,7 +18,7 @@ interface Attrs extends IInternalModalAttrs {
 export default class BanFromDiscussionModal extends Modal<Attrs> {
   activeTab: 'ban' | 'list' = 'ban';
 
-  private _searchQuery = '';
+  searchQuery = '';
   isDropdownDismissed = false;
   showResults = true;
   searchResults: User[] = [];
@@ -30,33 +30,21 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   bansFilter = Stream('');
   searchTimeout: number | null = null;
 
-  get searchQuery(): any {
+  get query(): any {
     const fn = (val?: string) => {
       if (val !== undefined) {
-        this._searchQuery = String(val);
-        return this._searchQuery;
+        this.searchQuery = String(val);
+        return this.searchQuery;
       }
-      return this._searchQuery;
+      return this.searchQuery;
     };
-    fn.toString = () => this._searchQuery;
-    fn.valueOf = () => this._searchQuery;
+    fn.toString = () => this.searchQuery;
+    fn.valueOf = () => this.searchQuery;
     return fn;
   }
 
-  set searchQuery(val: any) {
-    if (typeof val === 'function') {
-      this._searchQuery = String(val());
-    } else {
-      this._searchQuery = String(val ?? '');
-    }
-  }
-
-  get query(): any {
-    return this.searchQuery;
-  }
-
   set query(val: any) {
-    this.searchQuery = val;
+    this.searchQuery = typeof val === 'function' ? String(val()) : String(val ?? '');
   }
 
   oninit(vnode: any) {
@@ -117,7 +105,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   }
 
   banTab() {
-    const query = (typeof this.searchQuery === 'function' ? this.searchQuery() : this.searchQuery).trim();
+    const query = this.searchQuery.trim();
 
     return (
       <div className="BanFromDiscussionModal-content">
@@ -150,7 +138,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
                   type="text"
                   placeholder={String(app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.search_placeholder'))}
                   oninput={(e: any) => this.onQueryInput(e.target.value)}
-                  value={typeof this.searchQuery === 'function' ? this.searchQuery() : this.searchQuery}
+                  value={this.searchQuery}
                 />
                 {this.searching && (
                   <div className="BanFromDiscussionModal-searchSpinner">
@@ -301,16 +289,16 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
   }
 
   onQueryInput(value: string) {
+    this.searchQuery = value;
     this.isDropdownDismissed = false;
     this.showResults = true;
-    this.searchQuery(value);
 
     if (this.searchTimeout) {
       window.clearTimeout(this.searchTimeout);
       this.searchTimeout = null;
     }
 
-    const trimmed = value.trim();
+    const trimmed = this.searchQuery.trim();
     if (trimmed.length < 2) {
       this.searchResults = [];
       this.searching = false;
@@ -318,11 +306,13 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
       return;
     }
 
+    this.searching = true;
+    m.redraw();
     this.searchTimeout = window.setTimeout(() => this.search(trimmed), 300);
   }
 
-  search(value: string) {
-    const trimmed = value.trim();
+  search(query?: string) {
+    const trimmed = (query !== undefined ? query : this.searchQuery).trim();
     if (trimmed.length < 2) {
       this.searchResults = [];
       this.searching = false;
@@ -340,15 +330,16 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         params: { filter: { q: trimmed } },
       })
       .then((response: any) => {
-        const currentQuery = typeof this.searchQuery === 'function' ? this.searchQuery() : this.searchQuery;
-        if (String(currentQuery).trim().length < 2) {
+        if (this.searchQuery.trim().length < 2) {
           this.searchResults = [];
           this.searching = false;
           m.redraw();
           return;
         }
 
-        this.searchResults = app.store.pushPayload(response) as unknown as User[];
+        const pushed = app.store.pushPayload(response);
+        const users = Array.isArray(pushed) ? pushed : pushed ? [pushed] : [];
+        this.searchResults = users as User[];
         this.searching = false;
         this.isDropdownDismissed = false;
         this.showResults = true;
