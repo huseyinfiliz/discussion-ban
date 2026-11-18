@@ -24,7 +24,8 @@ class DiscussionBanResource extends AbstractDatabaseResource
 {
     public function __construct(
         protected Dispatcher $events
-    ) {}
+    ) {
+    }
 
     public function type(): string
     {
@@ -39,6 +40,7 @@ class DiscussionBanResource extends AbstractDatabaseResource
     public function scope(Builder $query, JsonApiContext $context): void
     {
         $query->whereNull('revoked_at');
+        $query->whereIn('discussion_id', Discussion::whereVisibleTo($context->getActor())->select('discussions.id'));
     }
 
     public function endpoints(): array
@@ -52,7 +54,7 @@ class DiscussionBanResource extends AbstractDatabaseResource
                     $discussionId = $filters['discussion'] ?? null;
 
                     if ($discussionId) {
-                        $discussion = Discussion::findOrFail($discussionId);
+                        $discussion = Discussion::whereVisibleTo($actor)->findOrFail($discussionId);
                         $actor->assertCan('banUsers', $discussion);
 
                         $query->where('discussion_id', $discussionId);
@@ -102,7 +104,7 @@ class DiscussionBanResource extends AbstractDatabaseResource
             throw new ValidationException(['user' => 'Discussion and user are required.']);
         }
 
-        $discussion = Discussion::findOrFail($discussionId);
+        $discussion = Discussion::whereVisibleTo($actor)->findOrFail($discussionId);
         $actor->assertCan('banUsers', $discussion);
 
         $targetUser = User::findOrFail($userId);
@@ -143,6 +145,7 @@ class DiscussionBanResource extends AbstractDatabaseResource
                 'hidden_at' => $now,
                 'hidden_user_id' => $actor->id,
                 'is_discussion_ban_hidden' => true,
+                'discussion_ban_id' => $model->id,
             ]);
 
         if ($affected > 0) {
@@ -167,7 +170,7 @@ class DiscussionBanResource extends AbstractDatabaseResource
         /** @var DiscussionBan $model */
         $actor = $context->getActor();
 
-        $discussion = $model->discussion ?: Discussion::findOrFail($model->discussion_id);
+        $discussion = Discussion::whereVisibleTo($actor)->findOrFail($model->discussion_id);
         $actor->assertCan('banUsers', $discussion);
 
         $model->revoked_at = Carbon::now();
@@ -179,10 +182,12 @@ class DiscussionBanResource extends AbstractDatabaseResource
         $affected = Post::where('discussion_id', $model->discussion_id)
             ->where('user_id', $model->user_id)
             ->where('is_discussion_ban_hidden', true)
+            ->where('discussion_ban_id', $model->id)
             ->update([
                 'hidden_at' => null,
                 'hidden_user_id' => null,
                 'is_discussion_ban_hidden' => false,
+                'discussion_ban_id' => null,
             ]);
 
         if ($affected > 0) {
