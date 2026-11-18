@@ -23,7 +23,8 @@ class SendNotificationWhenDiscussionBanChanged
     public function __construct(
         protected NotificationSyncer $notifications,
         protected SettingsRepositoryInterface $settings
-    ) {}
+    ) {
+    }
 
     public function handle(Event\Banned|Event\Unbanned $event): void
     {
