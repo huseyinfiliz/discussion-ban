@@ -8,16 +8,10 @@ permissions:
 jobs:
   run:
     uses: flarum/framework/.github/workflows/REUSABLE_backend.yml@6f4e63540f569c685dc6d45777e84fdc7e90eeeb # 2.x
-    with:
-      enable_backend_testing: true
-
-      backend_directory: .
 
   verify:
-    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'PHP checks (covered by push)' || 'PHP checks' }}
-    if: >-
-      always() &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    name: ${{ needs.run.result == 'skipped' && 'PHP checks skipped' || 'PHP checks' }}
+    if: always() && needs.run.result != 'skipped'
     needs: run
     runs-on: ubuntu-latest
     steps:
