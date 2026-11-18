@@ -2,18 +2,35 @@ name: Discussion Ban JS
 
 on: [workflow_dispatch, push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   run:
-    uses: flarum/framework/.github/workflows/REUSABLE_frontend.yml@2.x
-    with:
-      enable_bundlewatch: false
-      enable_prettier: true
-      enable_typescript: true
-      enable_tests: false
-
-      frontend_directory: ./js
-      backend_directory: .
-      js_package_manager: yarn
-      main_git_branch: 2.x
-    secrets:
-      bundlewatch_github_token: ${{ secrets.BUNDLEWATCH_GITHUB_TOKEN }}
+    name: JS checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: yarn
+          cache-dependency-path: js/yarn.lock
+      - name: Enable the pinned Yarn version
+        run: corepack enable
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Install PHP dependencies for core typings
+        run: composer install --no-interaction --prefer-dist
+        env:
+          COMPOSER_ROOT_VERSION: dev-2.x
+          COMPOSER_AUTH: ${{ format('{{"github-oauth":{{"github.com":"{0}"}}}}', github.token) }}
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+        working-directory: js
+      - name: Check formatting, types, and production builds
+        run: yarn format-check && yarn check-typings && yarn check-typings-coverage && yarn build-typings && yarn build
+        working-directory: js
