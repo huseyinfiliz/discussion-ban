@@ -10,5 +10,6 @@ class Unbanned
     public function __construct(
         public DiscussionBan $ban,
         public User $actor
-    ) {}
+    ) {
+    }
 }

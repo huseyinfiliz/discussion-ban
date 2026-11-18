@@ -7,7 +7,7 @@ A [Flarum](https://flarum.org) extension. Allows administrators and authorized m
 ## Features
 
 - **Discussion-Level Bans:** Ban disruptive users from specific discussions directly from discussion controls or post action menus.
-- **Automatic Post Moderation:** Automatically hides all existing posts by the banned user in that discussion, and restores them if the ban is revoked.
+- **Automatic Post Moderation:** Hides the user's currently visible posts in that discussion. Revoking the ban restores only posts still hidden by that ban, preserving independent staff moderation.
 - **Reply Restriction:** Banned users are strictly prevented from posting further replies.
 - **Discussion Visibility Control:** Optional setting to hide the discussion completely from banned users or keep it visible in read-only mode.
 - **Participant Search:** Quickly find and ban active participants within the discussion modal.
@@ -29,6 +29,14 @@ composer update huseyinfiliz/discussion-ban:"*"
 php flarum migrate
 php flarum cache:clear
 ```
+
+### Post moderation upgrade note
+
+To preserve independent staff moderation, posts hidden before this security update remain hidden when an older ban is revoked. Staff should review and manually restore those posts if appropriate. New bans restore their hidden posts automatically unless a moderator has independently restored or re-hidden them.
+
+### Audit log integration
+
+When `flarum/audit` is installed and enabled, Discussion Ban registers `discussion_ban.banned` and `discussion_ban.unbanned`. Records identify the acting moderator, ban, discussion, and affected user; ban records also include the reason. Audit remains optional.
 
 ## Permissions
 

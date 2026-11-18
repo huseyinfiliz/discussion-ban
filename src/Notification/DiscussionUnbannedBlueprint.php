@@ -23,7 +23,8 @@ class DiscussionUnbannedBlueprint implements BlueprintInterface, AlertableInterf
     public function __construct(
         public DiscussionBan $ban,
         public User $actor
-    ) {}
+    ) {
+    }
 
     public function getSubject(): ?AbstractModel
     {

@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      composer-compatible:
+        update-types: [minor, patch]
+
+  # Dependabot uses the npm ecosystem for Yarn manifests and yarn.lock.
+  - package-ecosystem: npm
+    directory: /js
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      yarn-compatible:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']

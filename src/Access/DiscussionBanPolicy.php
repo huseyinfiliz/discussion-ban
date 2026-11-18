@@ -12,7 +12,8 @@ class DiscussionBanPolicy extends AbstractPolicy
 {
     public function __construct(
         protected SettingsRepositoryInterface $settings
-    ) {}
+    ) {
+    }
 
     public function reply(User $actor, Discussion $discussion): ?string
     {
@@ -36,6 +37,10 @@ class DiscussionBanPolicy extends AbstractPolicy
 
     public function banUsers(User $actor, Discussion $discussion): ?string
     {
+        if ($actor->id && DiscussionBan::isUserBanned($discussion->id, $actor->id)) {
+            return static::FORCE_DENY;
+        }
+
         if ($actor->hasPermission('discussion.banUsers')) {
             return static::ALLOW;
         }

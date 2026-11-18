@@ -9,14 +9,13 @@ use Flarum\Api\Schema;
 use Flarum\Api\Serializer;
 use Flarum\Discussion\Discussion;
 use Flarum\Extend;
+use Flarum\Post\Event\Hidden;
+use Flarum\Post\Event\Restored;
 use Flarum\Post\Post;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 use HuseyinFiliz\DiscussionBan\Access\DiscussionBanPolicy;
 use HuseyinFiliz\DiscussionBan\Api\Resource\DiscussionBanResource;
-use HuseyinFiliz\DiscussionBan\Event;
-use HuseyinFiliz\DiscussionBan\Listener;
-use HuseyinFiliz\DiscussionBan\Notification;
 use Illuminate\Database\Eloquent\Builder;
 
 use function Tobyz\JsonApiServer\json_api_response;
@@ -64,6 +63,8 @@ return [
         ->type(Notification\DiscussionUnbannedBlueprint::class, ['alert']),
 
     (new Extend\Event())
+        ->listen(Hidden::class, Listener\ClearBanHideProvenance::class)
+        ->listen(Restored::class, Listener\ClearBanHideProvenance::class)
         ->listen(Event\Banned::class, Listener\SendNotificationWhenDiscussionBanChanged::class)
         ->listen(Event\Unbanned::class, Listener\SendNotificationWhenDiscussionBanChanged::class),
 
@@ -117,25 +118,26 @@ return [
     (new Extend\ApiResource(Resource\UserResource::class))
         ->endpoints(fn () => [
             Endpoint\Endpoint::make('discussion-participants')
+                ->authenticated()
                 ->route('GET', '/discussion-participants/{discussionId}')
                 ->action(function (Context $context) {
                     $actor = $context->getActor();
 
                     $discussionId = $context->request->getAttribute('routeParameters')['discussionId'];
-                    $discussion = Discussion::findOrFail($discussionId);
+                    $discussion = Discussion::whereVisibleTo($actor)->findOrFail($discussionId);
 
                     $actor->assertCan('banUsers', $discussion);
 
                     $q = $context->request->getQueryParams()['filter']['q'] ?? null;
 
                     $userIds = Post::where('discussion_id', $discussion->id)
+                        ->whereVisibleTo($actor)
                         ->whereNotNull('user_id')
-                        ->distinct()
-                        ->pluck('user_id');
+                        ->select('user_id');
 
                     $bannedUserIds = DiscussionBan::where('discussion_id', $discussion->id)
                         ->active()
-                        ->pluck('user_id');
+                        ->select('user_id');
 
                     $query = User::whereIn('id', $userIds)
                         ->whereNotIn('id', $bannedUserIds)
@@ -173,6 +175,7 @@ return [
                     Event\Banned::class,
                     'discussion_ban.banned',
                     fn (Event\Banned $event) => [
+                        'ban_id' => $event->ban->id,
                         'discussion_id' => $event->ban->discussion_id,
                         'user_id' => $event->ban->user_id,
                         'reason' => $event->ban->reason,
@@ -182,6 +185,7 @@ return [
                     Event\Unbanned::class,
                     'discussion_ban.unbanned',
                     fn (Event\Unbanned $event) => [
+                        'ban_id' => $event->ban->id,
                         'discussion_id' => $event->ban->discussion_id,
                         'user_id' => $event->ban->user_id,
                     ]

@@ -8,6 +8,7 @@ import humanTime from 'flarum/common/helpers/humanTime';
 import type Discussion from 'flarum/common/models/Discussion';
 import type User from 'flarum/common/models/User';
 import type DiscussionBan from '../../common/models/DiscussionBan';
+import refreshDiscussionPosts from '../utils/refreshDiscussionPosts';
 
 interface Attrs extends IInternalModalAttrs {
   discussion: Discussion;
@@ -454,7 +455,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
           user: this.selectedUser,
         },
       })
-      .then((ban: DiscussionBan) => {
+      .then(async (ban: DiscussionBan) => {
         this.loading = false;
 
         const userId = String(this.selectedUser!.id());
@@ -464,11 +465,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         const newCount = currentCount + 1;
         this.attrs.discussion.pushAttributes({ bannedUserMap: map, discussionBansCount: newCount });
 
-        app.store.all<any>('posts').forEach((post) => {
-          if (post.discussion()?.id() === this.attrs.discussion.id() && String(post.user()?.id()) === userId) {
-            post.pushAttributes({ isHidden: true, hiddenAt: new Date().toISOString(), isDiscussionBanHidden: true });
-          }
-        });
+        await refreshDiscussionPosts(this.attrs.discussion, userId);
 
         app.alerts.show({ type: 'success' }, app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.ban_success'));
         this.hide();
@@ -509,7 +506,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
     const user = ban.user();
     const userId = user ? String(user.id()) : null;
 
-    ban.delete().then(() => {
+    ban.delete().then(async () => {
       this.bans = this.bans.filter((b) => b.id() !== ban.id());
 
       if (userId) {
@@ -519,11 +516,7 @@ export default class BanFromDiscussionModal extends Modal<Attrs> {
         const newCount = Math.max(0, currentCount - 1);
         this.attrs.discussion.pushAttributes({ bannedUserMap: map, discussionBansCount: newCount });
 
-        app.store.all<any>('posts').forEach((post) => {
-          if (post.discussion()?.id() === this.attrs.discussion.id() && String(post.user()?.id()) === userId) {
-            post.pushAttributes({ isHidden: false, hiddenAt: null, isDiscussionBanHidden: false });
-          }
-        });
+        await refreshDiscussionPosts(this.attrs.discussion, userId);
       }
 
       app.alerts.show({ type: 'success' }, app.translator.trans('huseyinfiliz-discussion-ban.forum.modal.unban_success'));

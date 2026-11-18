@@ -2,10 +2,26 @@ name: Discussion Ban PHP
 
 on: [workflow_dispatch, push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   run:
-    uses: flarum/framework/.github/workflows/REUSABLE_backend.yml@2.x
+    uses: flarum/framework/.github/workflows/REUSABLE_backend.yml@6f4e63540f569c685dc6d45777e84fdc7e90eeeb # 2.x
     with:
       enable_backend_testing: true
 
       backend_directory: .
+
+  verify:
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'PHP checks (covered by push)' || 'PHP checks' }}
+    if: >-
+      always() &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    needs: run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful backend checks
+        env:
+          RESULT: ${{ needs.run.result }}
+        run: test "$RESULT" = success

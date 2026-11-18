@@ -1,6 +1,7 @@
 {
   "name": "@huseyinfiliz/discussion-ban",
   "private": true,
+  "packageManager": "yarn@1.22.22",
   "version": "0.0.0",
   "devDependencies": {
     "@flarum/jest-config": "^2.0.0",
@@ -19,7 +20,7 @@
     "analyze": "cross-env ANALYZER=true yarn run build",
     "format": "prettier --write src",
     "format-check": "prettier --check src",
-    "clean-typings": "npx rimraf dist-typings && mkdir dist-typings",
+    "clean-typings": "node -e \"require('node:fs').rmSync('dist-typings', { recursive: true, force: true }); require('node:fs').mkdirSync('dist-typings');\"",
     "build-typings": "yarn run clean-typings && ([ -e src/@types ] && cp -r src/@types dist-typings/@types || true) && tsc && yarn run post-build-typings",
     "post-build-typings": "find dist-typings -type f -name '*.d.ts' -print0 | xargs -0 sed -i 's,../src/@types,@types,g'",
     "check-typings": "tsc --noEmit --emitDeclarationOnly false",
