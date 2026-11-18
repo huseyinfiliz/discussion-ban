@@ -338,18 +338,19 @@
   }
 }
 
-.item-discussion-ban {
-  .Button {
-    width: 100%;
-    text-align: start;
+.DiscussionBanButton {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: start;
+  white-space: normal;
 
-    .Button-icon {
-      margin-inline-end: 6px;
-    }
+  .Button-icon {
+    flex-shrink: 0;
+  }
 
-    .Button-label {
-      display: inline !important;
-    }
+  .Button-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 
